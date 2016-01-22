@@ -23,7 +23,6 @@
       tools:text="15:50"
       />
 
-
   <TextView
       android:id="@+id/text_view_date"
       android:layout_width="wrap_content"
@@ -55,7 +54,7 @@
     <ImageView
         android:layout_width="30dip"
         android:layout_height="30dip"
-        android:src="@drawable/art_clear"
+        android:id="@+id/weather_status_image"
         />
 
     <TextView

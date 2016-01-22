@@ -55,7 +55,7 @@
     <ImageView
         android:layout_width="30dip"
         android:layout_height="30dip"
-        android:src="@drawable/art_clear"
+        android:id="@+id/weather_status_image"
         />
 
     <TextView
