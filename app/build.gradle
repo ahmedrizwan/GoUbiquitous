@@ -1,5 +1,4 @@
 apply plugin: 'com.android.application'
-apply plugin: 'com.google.gms.google-services'
 apply from: 'keys.gradle'
 
 android {
@@ -20,9 +19,9 @@ android {
     }
   }
 
-  buildTypes.each {
-    it.buildConfigField 'String', 'OPEN_WEATHER_MAP_API_KEY', project.weatherApi
-  }
+//  buildTypes.each {
+//    it.buildConfigField 'String', 'OPEN_WEATHER_MAP_API_KEY', "5bcd598bf0c75ca5eb6939875e38031c"
+//  }
 }
 
 dependencies {
@@ -40,3 +39,5 @@ dependencies {
   compile 'io.reactivex:rxjava:1.1.0'
   compile 'com.google.android.gms:play-services-wearable:8.4.0'
 }
+
+apply plugin: 'com.google.gms.google-services'

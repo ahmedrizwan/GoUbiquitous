@@ -29,7 +29,6 @@ import android.support.v4.app.TaskStackBuilder;
 import android.text.format.Time;
 import android.util.Log;
 import com.bumptech.glide.Glide;
-import com.example.android.sunshine.app.BuildConfig;
 import com.example.android.sunshine.app.MainActivity;
 import com.example.android.sunshine.app.R;
 import com.example.android.sunshine.app.Utility;
@@ -137,7 +136,7 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
           .appendQueryParameter(FORMAT_PARAM, format)
           .appendQueryParameter(UNITS_PARAM, units)
           .appendQueryParameter(DAYS_PARAM, Integer.toString(numDays))
-          .appendQueryParameter(APPID_PARAM, BuildConfig.OPEN_WEATHER_MAP_API_KEY)
+          .appendQueryParameter(APPID_PARAM, "5bcd598bf0c75ca5eb6939875e38031c")
           .build();
 
       URL url = new URL(builtUri.toString());
