@@ -7,11 +7,14 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
+import android.view.View;
+
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.wearable.Asset;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
+
 import java.io.ByteArrayOutputStream;
 
 public class TestActivity extends Activity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
@@ -26,15 +29,19 @@ public class TestActivity extends Activity implements GoogleApiClient.Connection
         .addOnConnectionFailedListener(this)
         .addApi(Wearable.API)
         .build();
-    Log.e("OnCreate", "Before");
     mGoogleApiClient.connect();
 
-    Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_clear);
-    Asset asset = createAssetFromBitmap(bitmap);
-    PutDataRequest request = PutDataRequest.create("/image");
-    request.putAsset("weather", asset);
-    Wearable.DataApi.putDataItem(mGoogleApiClient, request);
-    Log.e("OnCreate", "After");
+    findViewById(R.id.clickButton).setOnClickListener(new View.OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_clear);
+        Asset asset = createAssetFromBitmap(bitmap);
+        PutDataRequest request = PutDataRequest.create("/image");
+        request.putAsset("weather", asset);
+        Wearable.DataApi.putDataItem(mGoogleApiClient, request);
+      }
+    });
+
   }
 
   private static Asset createAssetFromBitmap(Bitmap bitmap) {
@@ -44,14 +51,15 @@ public class TestActivity extends Activity implements GoogleApiClient.Connection
   }
 
   @Override public void onConnected(@Nullable Bundle bundle) {
-    Log.e("Wear", "Connected");
+    Log.e("App", "Connected");
+
   }
 
   @Override public void onConnectionSuspended(int i) {
-    Log.e("Wear", "Suspended");
+    Log.e("App", "Suspended");
   }
 
   @Override public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-    Log.e("Wear", "Failed "+connectionResult.getErrorMessage());
+    Log.e("App", "Failed "+connectionResult.getErrorMessage());
   }
 }
