@@ -19,47 +19,57 @@ import java.io.ByteArrayOutputStream;
 
 public class TestActivity extends Activity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
-  private GoogleApiClient mGoogleApiClient;
+    private GoogleApiClient mGoogleApiClient;
 
-  @Override protected void onCreate(Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
-    setContentView(R.layout.activity_test);
-    mGoogleApiClient = new GoogleApiClient.Builder(this)
-        .addConnectionCallbacks(this)
-        .addOnConnectionFailedListener(this)
-        .addApi(Wearable.API)
-        .build();
-    mGoogleApiClient.connect();
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_test);
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(Wearable.API)
+                .build();
+        mGoogleApiClient.connect();
 
-    findViewById(R.id.clickButton).setOnClickListener(new View.OnClickListener() {
-      @Override
-      public void onClick(View v) {
-        Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_clear);
-        Asset asset = createAssetFromBitmap(bitmap);
-        PutDataRequest request = PutDataRequest.create("/image");
-        request.putAsset("weather", asset);
-        Wearable.DataApi.putDataItem(mGoogleApiClient, request);
-      }
-    });
+        findViewById(R.id.clickButton).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_clear);
+                        Asset asset = createAssetFromBitmap(bitmap);
+                        PutDataRequest request = PutDataRequest.create("/image");
+                        request.putAsset("weather", asset);
+                        Wearable.DataApi.putDataItem(mGoogleApiClient, request);
+                    }
+                }).start();
 
-  }
+            }
+        });
 
-  private static Asset createAssetFromBitmap(Bitmap bitmap) {
-    final ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
-    bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteStream);
-    return Asset.createFromBytes(byteStream.toByteArray());
-  }
+    }
 
-  @Override public void onConnected(@Nullable Bundle bundle) {
-    Log.e("App", "Connected");
+    private static Asset createAssetFromBitmap(Bitmap bitmap) {
+        final ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteStream);
+        return Asset.createFromBytes(byteStream.toByteArray());
+    }
 
-  }
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+        Log.e("App", "Connected");
 
-  @Override public void onConnectionSuspended(int i) {
-    Log.e("App", "Suspended");
-  }
+    }
 
-  @Override public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-    Log.e("App", "Failed "+connectionResult.getErrorMessage());
-  }
+    @Override
+    public void onConnectionSuspended(int i) {
+        Log.e("App", "Suspended");
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+        Log.e("App", "Failed " + connectionResult.getErrorMessage());
+    }
 }
