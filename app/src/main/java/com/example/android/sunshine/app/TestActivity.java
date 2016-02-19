@@ -41,11 +41,10 @@ public class TestActivity extends Activity implements GoogleApiClient.Connection
                         Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_clear);
                         Asset asset = createAssetFromBitmap(bitmap);
                         PutDataRequest request = PutDataRequest.create("/image");
-                        request.putAsset("weather", asset);
+                        request.putAsset("photo", asset);
                         Wearable.DataApi.putDataItem(mGoogleApiClient, request);
                     }
                 }).start();
-
             }
         });
 
@@ -60,7 +59,6 @@ public class TestActivity extends Activity implements GoogleApiClient.Connection
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         Log.e("App", "Connected");
-
     }
 
     @Override
