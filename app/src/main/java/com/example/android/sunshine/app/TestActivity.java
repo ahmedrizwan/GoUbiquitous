@@ -11,11 +11,16 @@ import android.view.View;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.Asset;
+import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.Date;
 
 public class TestActivity extends Activity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
@@ -35,18 +40,29 @@ public class TestActivity extends Activity implements GoogleApiClient.Connection
         findViewById(R.id.clickButton).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_clear);
-                        Asset asset = createAssetFromBitmap(bitmap);
-                        PutDataRequest request = PutDataRequest.create("/image");
-                        request.putAsset("photo", asset);
-                        Wearable.DataApi.putDataItem(mGoogleApiClient, request);
-                    }
-                }).start();
+                Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.art_clear);
+                Asset asset = createAssetFromBitmap(bitmap);
+                sendPhoto(asset);
             }
         });
+
+    }
+
+    private void sendPhoto(Asset asset) {
+        PutDataMapRequest dataMap = PutDataMapRequest.create("/image");
+        dataMap.getDataMap().putAsset("weather", asset);
+        dataMap.getDataMap().putLong("time", new Date().getTime());
+        PutDataRequest request = dataMap.asPutDataRequest();
+        request.setUrgent();
+
+        Wearable.DataApi.putDataItem(mGoogleApiClient, request)
+                .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+                    @Override
+                    public void onResult(DataApi.DataItemResult dataItemResult) {
+                        Log.e("App", "Sending image was successful: " + dataItemResult.getStatus()
+                                .isSuccess());
+                    }
+                });
 
     }
 
@@ -54,6 +70,23 @@ public class TestActivity extends Activity implements GoogleApiClient.Connection
         final ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteStream);
         return Asset.createFromBytes(byteStream.toByteArray());
+    }
+
+    private static Asset toAsset(Bitmap bitmap) {
+        ByteArrayOutputStream byteStream = null;
+        try {
+            byteStream = new ByteArrayOutputStream();
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteStream);
+            return Asset.createFromBytes(byteStream.toByteArray());
+        } finally {
+            if (null != byteStream) {
+                try {
+                    byteStream.close();
+                } catch (IOException e) {
+                    // ignore
+                }
+            }
+        }
     }
 
     @Override
