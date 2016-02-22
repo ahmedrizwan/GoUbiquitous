@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.wearable.view.WatchViewStub;
 import android.util.Log;
@@ -11,13 +12,18 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.Asset;
+import com.google.android.gms.wearable.CapabilityInfo;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.DataMapItem;
+import com.google.android.gms.wearable.MessageApi;
+import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.Wearable;
 import java.io.InputStream;
+import java.util.Set;
 import rx.Observable;
 import rx.Subscriber;
 import rx.android.schedulers.AndroidSchedulers;
@@ -42,6 +48,9 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
     });
 
     mGoogleApiClient = new GoogleApiClient.Builder(this).addApi(Wearable.API).addConnectionCallbacks(this).addOnConnectionFailedListener(this).build();
+    //trigger a sync from here!
+    //send a message to device to get the latest weather data
+
   }
 
   @Override protected void onResume() {
@@ -105,4 +114,45 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
       }
     }
   }
+
+  private String transcriptionNodeId = null;
+
+  private void updateTranscriptionCapability(CapabilityInfo capabilityInfo) {
+    Set<Node> connectedNodes = capabilityInfo.getNodes();
+
+    transcriptionNodeId = pickBestNodeId(connectedNodes);
+  }
+
+  private String pickBestNodeId(Set<Node> nodes) {
+    String bestNodeId = null;
+    // Find a nearby node or pick one arbitrarily
+    for (Node node : nodes) {
+      if (node.isNearby()) {
+        return node.getId();
+      }
+      bestNodeId = node.getId();
+    }
+    return bestNodeId;
+  }
+  public static final String VOICE_TRANSCRIPTION_MESSAGE_PATH = "/voice_transcription";
+
+  private void requestTranscription(byte[] voiceData) {
+    if (transcriptionNodeId != null) {
+      Wearable.MessageApi.sendMessage(mGoogleApiClient, transcriptionNodeId,
+          VOICE_TRANSCRIPTION_MESSAGE_PATH, voiceData).setResultCallback(new ResultCallback<MessageApi.SendMessageResult>() {
+        @Override public void onResult(@NonNull MessageApi.SendMessageResult sendMessageResult) {
+          if (!sendMessageResult.getStatus().isSuccess()) {
+            // Failed to send message
+            Log.e("Wear", "Message sending failed!");
+          } else {
+            Log.e("Wear", "Message sent!");
+          }
+        }
+      });
+    } else {
+      // Unable to retrieve node with transcription capability
+      Log.e("Wear", "Unable to get node");
+    }
+  }
+
 }
