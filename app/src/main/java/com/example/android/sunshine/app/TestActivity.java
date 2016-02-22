@@ -8,6 +8,7 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
 import android.view.View;
+import android.widget.Toast;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
@@ -44,7 +45,6 @@ public class TestActivity extends Activity
 
   @Override protected void onPause() {
     super.onPause();
-    Wearable.MessageApi.addListener(mGoogleApiClient, this);
   }
 
   private void sendPhoto(Asset asset) {
@@ -86,18 +86,29 @@ public class TestActivity extends Activity
 
   @Override public void onConnected(@Nullable Bundle bundle) {
     Log.e("App", "Connected");
+    Wearable.MessageApi.addListener(mGoogleApiClient, this);
+  }
+
+  @Override protected void onStop() {
+    super.onStop();
+    Wearable.MessageApi.removeListener(mGoogleApiClient, this);
   }
 
   @Override public void onConnectionSuspended(int i) {
     Log.e("App", "Suspended");
-    Wearable.MessageApi.addListener(mGoogleApiClient, this);
   }
 
   @Override public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
     Log.e("App", "Failed " + connectionResult.getErrorMessage());
+    Wearable.MessageApi.removeListener(mGoogleApiClient, this);
   }
 
+  public static final String TRIGGER_SYNC_PATH = "/trigger_sync_sunshine";
+
   @Override public void onMessageReceived(MessageEvent messageEvent) {
-    Log.e("Message", messageEvent.toString());
+    Toast.makeText(TestActivity.this, "onMessageReceived", Toast.LENGTH_SHORT).show();
+    if (messageEvent.getPath().equals(TRIGGER_SYNC_PATH)) {
+      Toast.makeText(TestActivity.this, "Trigger Sync", Toast.LENGTH_SHORT).show();
+    }
   }
 }

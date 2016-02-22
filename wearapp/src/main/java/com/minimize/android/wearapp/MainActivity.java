@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.wearable.view.WatchViewStub;
 import android.util.Log;
@@ -14,6 +13,7 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.Asset;
+import com.google.android.gms.wearable.CapabilityApi;
 import com.google.android.gms.wearable.CapabilityInfo;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.DataEvent;
@@ -27,6 +27,7 @@ import java.util.Set;
 import rx.Observable;
 import rx.Subscriber;
 import rx.android.schedulers.AndroidSchedulers;
+import rx.functions.Action1;
 import rx.schedulers.Schedulers;
 
 public class MainActivity extends Activity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, DataApi.DataListener {
@@ -35,6 +36,8 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
   private ImageView mImageView;
 
   private GoogleApiClient mGoogleApiClient;
+  private static final String SYNC_CAPABILITY = "trigger_sync";
+  public static final String TRIGGER_SYNC_PATH = "/trigger_sync_sunshine";
 
   @Override protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
@@ -50,7 +53,64 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
     mGoogleApiClient = new GoogleApiClient.Builder(this).addApi(Wearable.API).addConnectionCallbacks(this).addOnConnectionFailedListener(this).build();
     //trigger a sync from here!
     //send a message to device to get the latest weather data
+    setupVoiceTranscription();
+  }
 
+  private void setupVoiceTranscription() {
+    Observable.create(new Observable.OnSubscribe<CapabilityApi.GetCapabilityResult>() {
+      @Override public void call(Subscriber<? super CapabilityApi.GetCapabilityResult> subscriber) {
+        CapabilityApi.GetCapabilityResult result =
+            Wearable.CapabilityApi.getCapability(mGoogleApiClient, SYNC_CAPABILITY, CapabilityApi.FILTER_REACHABLE).await();
+        subscriber.onNext(result);
+        subscriber.onCompleted();
+      }
+    }).subscribeOn(Schedulers.newThread()).observeOn(AndroidSchedulers.mainThread()).subscribe(new Action1<CapabilityApi.GetCapabilityResult>() {
+      @Override public void call(CapabilityApi.GetCapabilityResult result) {
+        updateTranscriptionCapability(result.getCapability());
+        Log.e("Wear", "Done with the await stuff!");
+        requestSync();
+      }
+    });
+  }
+
+  private String transcriptionNodeId = null;
+
+  private void updateTranscriptionCapability(CapabilityInfo capabilityInfo) {
+    Set<Node> connectedNodes = capabilityInfo.getNodes();
+
+    transcriptionNodeId = pickBestNodeId(connectedNodes);
+  }
+
+  private String pickBestNodeId(Set<Node> nodes) {
+    String bestNodeId = null;
+    // Find a nearby node or pick one arbitrarily
+    for (Node node : nodes) {
+      if (node.isNearby()) {
+        return node.getId();
+      }
+      bestNodeId = node.getId();
+    }
+    return bestNodeId;
+  }
+
+  private void requestSync() {
+    if (transcriptionNodeId != null) {
+      Log.e("Wear", transcriptionNodeId);
+      Wearable.MessageApi.sendMessage(mGoogleApiClient, transcriptionNodeId, TRIGGER_SYNC_PATH, new byte[] { 0, 0 })
+          .setResultCallback(new ResultCallback<MessageApi.SendMessageResult>() {
+            @Override public void onResult(MessageApi.SendMessageResult sendMessageResult) {
+              if (!sendMessageResult.getStatus().isSuccess()) {
+                // Failed to send message
+                Log.e("Wear", "Sending message failed!");
+              } else {
+                Log.e("Wear", "Message sent!");
+              }
+            }
+          });
+    } else {
+      // Unable to retrieve node with transcription capability
+      Log.e("Wear", "Unable to find node with capability!");
+    }
   }
 
   @Override protected void onResume() {
@@ -114,45 +174,4 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
       }
     }
   }
-
-  private String transcriptionNodeId = null;
-
-  private void updateTranscriptionCapability(CapabilityInfo capabilityInfo) {
-    Set<Node> connectedNodes = capabilityInfo.getNodes();
-
-    transcriptionNodeId = pickBestNodeId(connectedNodes);
-  }
-
-  private String pickBestNodeId(Set<Node> nodes) {
-    String bestNodeId = null;
-    // Find a nearby node or pick one arbitrarily
-    for (Node node : nodes) {
-      if (node.isNearby()) {
-        return node.getId();
-      }
-      bestNodeId = node.getId();
-    }
-    return bestNodeId;
-  }
-  public static final String VOICE_TRANSCRIPTION_MESSAGE_PATH = "/voice_transcription";
-
-  private void requestTranscription(byte[] voiceData) {
-    if (transcriptionNodeId != null) {
-      Wearable.MessageApi.sendMessage(mGoogleApiClient, transcriptionNodeId,
-          VOICE_TRANSCRIPTION_MESSAGE_PATH, voiceData).setResultCallback(new ResultCallback<MessageApi.SendMessageResult>() {
-        @Override public void onResult(@NonNull MessageApi.SendMessageResult sendMessageResult) {
-          if (!sendMessageResult.getStatus().isSuccess()) {
-            // Failed to send message
-            Log.e("Wear", "Message sending failed!");
-          } else {
-            Log.e("Wear", "Message sent!");
-          }
-        }
-      });
-    } else {
-      // Unable to retrieve node with transcription capability
-      Log.e("Wear", "Unable to get node");
-    }
-  }
-
 }
