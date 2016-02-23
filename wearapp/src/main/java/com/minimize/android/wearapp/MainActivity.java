@@ -66,7 +66,7 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
       }
     }).subscribeOn(Schedulers.newThread()).observeOn(AndroidSchedulers.mainThread()).subscribe(new Action1<CapabilityApi.GetCapabilityResult>() {
       @Override public void call(CapabilityApi.GetCapabilityResult result) {
-        updateTranscriptionCapability(result.getCapability());
+        updateSyncCapability(result.getCapability());
         Log.e("Wear", "Done with the await stuff!");
         requestSync();
       }
@@ -75,12 +75,13 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 
   private String transcriptionNodeId = null;
 
-  private void updateTranscriptionCapability(CapabilityInfo capabilityInfo) {
+  private void updateSyncCapability(CapabilityInfo capabilityInfo) {
     Set<Node> connectedNodes = capabilityInfo.getNodes();
 
     transcriptionNodeId = pickBestNodeId(connectedNodes);
   }
 
+  //Picks the closest node
   private String pickBestNodeId(Set<Node> nodes) {
     String bestNodeId = null;
     // Find a nearby node or pick one arbitrarily
