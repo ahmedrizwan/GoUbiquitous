@@ -97,17 +97,7 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
   private void requestSync() {
     if (transcriptionNodeId != null) {
       Log.e("Wear", transcriptionNodeId);
-      Wearable.MessageApi.sendMessage(mGoogleApiClient, transcriptionNodeId, TRIGGER_SYNC_PATH, new byte[] { 0, 0 })
-          .setResultCallback(new ResultCallback<MessageApi.SendMessageResult>() {
-            @Override public void onResult(MessageApi.SendMessageResult sendMessageResult) {
-              if (!sendMessageResult.getStatus().isSuccess()) {
-                // Failed to send message
-                Log.e("Wear", "Sending message failed!");
-              } else {
-                Log.e("Wear", "Message sent!");
-              }
-            }
-          });
+
     } else {
       // Unable to retrieve node with transcription capability
       Log.e("Wear", "Unable to find node with capability!");
@@ -160,7 +150,6 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 
           myObservable.subscribeOn(Schedulers.newThread()).observeOn(AndroidSchedulers.mainThread()).subscribe(new Subscriber<Bitmap>() {
             @Override public void onCompleted() {
-
             }
 
             @Override public void onError(Throwable e) {
