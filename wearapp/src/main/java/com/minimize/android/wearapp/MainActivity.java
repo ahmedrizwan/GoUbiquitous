@@ -8,10 +8,8 @@ import android.support.annotation.Nullable;
 import android.support.wearable.view.WatchViewStub;
 import android.util.Log;
 import android.widget.ImageView;
-import android.widget.TextView;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.Asset;
 import com.google.android.gms.wearable.CapabilityApi;
 import com.google.android.gms.wearable.CapabilityInfo;
@@ -19,7 +17,6 @@ import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.DataMapItem;
-import com.google.android.gms.wearable.MessageApi;
 import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.Wearable;
 import java.io.InputStream;
@@ -32,7 +29,6 @@ import rx.schedulers.Schedulers;
 
 public class MainActivity extends Activity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, DataApi.DataListener {
 
-  private TextView mTextView;
   private ImageView mImageView;
 
   private GoogleApiClient mGoogleApiClient;
@@ -45,7 +41,6 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
     final WatchViewStub stub = (WatchViewStub) findViewById(R.id.watch_view_stub);
     stub.setOnLayoutInflatedListener(new WatchViewStub.OnLayoutInflatedListener() {
       @Override public void onLayoutInflated(WatchViewStub stub) {
-        mTextView = (TextView) stub.findViewById(R.id.text);
         mImageView = (ImageView) stub.findViewById(R.id.weather_status_image);
       }
     });
@@ -133,7 +128,9 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
       if (event.getType() == DataEvent.TYPE_CHANGED) {
         String path = event.getDataItem().getUri().getPath();
         if ("/image".equals(path)) {
+
           DataMapItem dataMapItem = DataMapItem.fromDataItem(event.getDataItem());
+
           final Asset photoAsset = dataMapItem.getDataMap().getAsset("weather");
           // Loads image on background thread.
           Observable<Bitmap> myObservable = Observable.create(new Observable.OnSubscribe<Bitmap>() {
