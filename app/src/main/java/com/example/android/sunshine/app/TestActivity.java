@@ -1,6 +1,7 @@
 package com.example.android.sunshine.app;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
@@ -14,25 +15,50 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.Asset;
 import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.DataMap;
 import com.google.android.gms.wearable.MessageApi;
 import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
+import com.patloew.rxwear.RxWear;
+import com.patloew.rxwear.transformers.MessageEventGetDataMap;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Date;
+import rx.functions.Action1;
+import rx.subscriptions.CompositeSubscription;
 
 public class TestActivity extends Activity
     implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, MessageApi.MessageListener {
 
   private GoogleApiClient mGoogleApiClient;
+  private CompositeSubscription subscription = new CompositeSubscription();
 
   @Override protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_test);
+    RxWear.init(this);
+
     mGoogleApiClient = new GoogleApiClient.Builder(this).addConnectionCallbacks(this).addOnConnectionFailedListener(this).addApi(Wearable.API).build();
     mGoogleApiClient.connect();
+    RxWear.init(this);
+
+    subscription.add(RxWear.Message.listen()
+        .compose(MessageEventGetDataMap.filterByPath("/message"))
+        .subscribe(new Action1<DataMap>() {
+          @Override public void call(DataMap dataMap) {
+            Intent startIntent = new Intent(TestActivity.this, TestActivity
+                .class);
+            startIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(startIntent);
+          }
+        }, new Action1<Throwable>() {
+          @Override public void call(Throwable throwable) {
+            Toast.makeText(TestActivity.this, "Error on message listen", Toast
+                .LENGTH_LONG).show();
+          }
+        }));
 
     findViewById(R.id.clickButton).setOnClickListener(new View.OnClickListener() {
       @Override public void onClick(View v) {
@@ -43,6 +69,14 @@ public class TestActivity extends Activity
     });
   }
 
+  @Override
+  protected void onDestroy() {
+    super.onDestroy();
+
+    if(subscription != null && !subscription.isUnsubscribed()) {
+      subscription.unsubscribe();
+    }
+  }
   @Override protected void onPause() {
     super.onPause();
   }
