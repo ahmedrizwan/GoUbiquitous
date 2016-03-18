@@ -26,6 +26,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.test.AndroidTestCase;
 import android.util.Log;
+
 import com.example.android.sunshine.app.data.WeatherContract.LocationEntry;
 import com.example.android.sunshine.app.data.WeatherContract.WeatherEntry;
 

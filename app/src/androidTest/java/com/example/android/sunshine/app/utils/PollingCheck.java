@@ -17,8 +17,9 @@
  */
 package com.example.android.sunshine.app.utils;
 
-import java.util.concurrent.Callable;
 import junit.framework.Assert;
+
+import java.util.concurrent.Callable;
 
 public abstract class PollingCheck {
     private static final long TIME_SLICE = 50;

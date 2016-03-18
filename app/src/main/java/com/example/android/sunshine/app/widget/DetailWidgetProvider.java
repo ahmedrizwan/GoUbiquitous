@@ -11,6 +11,7 @@ import android.os.Build;
 import android.support.annotation.NonNull;
 import android.support.v4.app.TaskStackBuilder;
 import android.widget.RemoteViews;
+
 import com.example.android.sunshine.app.DetailActivity;
 import com.example.android.sunshine.app.MainActivity;
 import com.example.android.sunshine.app.R;

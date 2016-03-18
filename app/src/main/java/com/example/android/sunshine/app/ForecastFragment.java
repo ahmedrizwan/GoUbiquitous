@@ -44,6 +44,7 @@ import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.widget.AbsListView;
 import android.widget.TextView;
+
 import com.example.android.sunshine.app.data.WeatherContract;
 import com.example.android.sunshine.app.sync.SunshineSyncAdapter;
 
@@ -64,7 +65,7 @@ public class ForecastFragment extends Fragment implements LoaderManager.LoaderCa
     private static final int FORECAST_LOADER = 0;
     // For the forecast view we're showing only a small subset of the stored data.
     // Specify the columns we need.
-    private static final String[] FORECAST_COLUMNS = {
+    public static final String[] FORECAST_COLUMNS = {
             // In this case the id needs to be fully qualified with a table name, since
             // the content provider joins the location & weather tables in the background
             // (both have an _id column)

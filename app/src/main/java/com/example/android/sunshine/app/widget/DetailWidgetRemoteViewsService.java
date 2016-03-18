@@ -11,11 +11,13 @@ import android.util.Log;
 import android.widget.AdapterView;
 import android.widget.RemoteViews;
 import android.widget.RemoteViewsService;
+
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.Target;
 import com.example.android.sunshine.app.R;
 import com.example.android.sunshine.app.Utility;
 import com.example.android.sunshine.app.data.WeatherContract;
+
 import java.util.concurrent.ExecutionException;
 
 /**

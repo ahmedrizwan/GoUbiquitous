@@ -15,8 +15,10 @@
  */
 package com.example.android.sunshine.app;
 
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcel;
+import android.os.Parcelable;
 import android.support.v4.util.LongSparseArray;
 import android.support.v4.view.ViewCompat;
 import android.support.v7.widget.RecyclerView;

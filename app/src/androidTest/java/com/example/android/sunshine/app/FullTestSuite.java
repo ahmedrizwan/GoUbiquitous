@@ -16,6 +16,7 @@
 package com.example.android.sunshine.app;
 
 import android.test.suitebuilder.TestSuiteBuilder;
+
 import junit.framework.Test;
 import junit.framework.TestSuite;
 

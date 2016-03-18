@@ -20,6 +20,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
 import android.util.Log;
+import android.widget.Toast;
+
 import com.example.android.sunshine.app.MainActivity;
 import com.example.android.sunshine.app.R;
 import com.google.android.gms.gcm.GoogleCloudMessaging;

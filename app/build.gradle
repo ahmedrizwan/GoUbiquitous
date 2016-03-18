@@ -1,5 +1,4 @@
 apply plugin: 'com.android.application'
-apply from: 'keys.gradle'
 
 android {
   compileSdkVersion 23
@@ -37,10 +36,10 @@ dependencies {
   compile 'com.android.support:recyclerview-v7:23.2.1'
   compile 'com.google.android.apps.muzei:muzei-api:2.0'
   compile 'com.google.android.gms:play-services-gcm:8.4.0'
+  compile 'com.google.android.gms:play-services-wearable:8.4.0'
   compile 'io.reactivex:rxandroid:1.1.0'
   compile 'io.reactivex:rxjava:1.1.0'
-  compile 'com.google.android.gms:play-services-wearable:8.4.0'
   compile 'com.patloew.rxwear:rxwear:1.0.0'
 }
-
 apply plugin: 'com.google.gms.google-services'
+

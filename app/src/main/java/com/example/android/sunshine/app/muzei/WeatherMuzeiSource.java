@@ -18,6 +18,7 @@ package com.example.android.sunshine.app.muzei;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
+
 import com.example.android.sunshine.app.MainActivity;
 import com.example.android.sunshine.app.Utility;
 import com.example.android.sunshine.app.data.WeatherContract;

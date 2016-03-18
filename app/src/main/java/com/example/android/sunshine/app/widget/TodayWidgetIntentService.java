@@ -28,6 +28,7 @@ import android.os.Bundle;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.widget.RemoteViews;
+
 import com.example.android.sunshine.app.MainActivity;
 import com.example.android.sunshine.app.R;
 import com.example.android.sunshine.app.Utility;

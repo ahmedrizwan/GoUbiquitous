@@ -8,22 +8,21 @@ import android.support.annotation.Nullable;
 import android.support.wearable.view.WatchViewStub;
 import android.util.Log;
 import android.widget.ImageView;
-import com.google.android.gms.common.ConnectionResult;
+import android.widget.TextView;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.Asset;
-import com.google.android.gms.wearable.CapabilityApi;
-import com.google.android.gms.wearable.CapabilityInfo;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataMap;
 import com.google.android.gms.wearable.DataMapItem;
-import com.google.android.gms.wearable.MessageApi;
-import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.Wearable;
 import com.patloew.rxwear.RxWear;
+import com.patloew.rxwear.transformers.DataEventGetDataMap;
 import java.io.InputStream;
-import java.util.Set;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.concurrent.TimeUnit;
 import rx.Observable;
 import rx.Subscriber;
 import rx.android.schedulers.AndroidSchedulers;
@@ -32,31 +31,62 @@ import rx.schedulers.Schedulers;
 import rx.subscriptions.CompositeSubscription;
 
 public class MainActivity extends Activity
-    implements GoogleApiClient.ConnectionCallbacks,
-    GoogleApiClient.OnConnectionFailedListener, DataApi.DataListener {
+    implements GoogleApiClient.ConnectionCallbacks, DataApi.DataListener {
 
+  private static final String START_ACTIVITY_PATH = "/start-activity";
   private ImageView mImageView;
+  private TextView textViewTime;
+  private TextView textViewDate;
 
-  private GoogleApiClient mGoogleApiClient;
-  private static final String SYNC_CAPABILITY = "trigger_sync";
-  public static final String TRIGGER_SYNC_PATH = "/trigger_sync_sunshine";
+  private TextView textViewTempHigh;
+  private TextView textViewTempLow;
 
   private CompositeSubscription subscription = new CompositeSubscription();
+  private GoogleApiClient mGoogleApiClient;
 
   @Override protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
     RxWear.init(this);
-    final WatchViewStub stub =
-        (WatchViewStub) findViewById(R.id.watch_view_stub);
-    stub.setOnLayoutInflatedListener(
-        new WatchViewStub.OnLayoutInflatedListener() {
-          @Override public void onLayoutInflated(WatchViewStub stub) {
-            mImageView =
-                (ImageView) stub.findViewById(R.id.weather_status_image);
+    mGoogleApiClient =
+        new GoogleApiClient.Builder(this).addConnectionCallbacks(this).addApi(Wearable.API).build();
+
+    final WatchViewStub stub = (WatchViewStub) findViewById(R.id.watch_view_stub);
+
+    stub.setOnLayoutInflatedListener(new WatchViewStub.OnLayoutInflatedListener() {
+      @Override public void onLayoutInflated(WatchViewStub stub) {
+        mImageView = (ImageView) stub.findViewById(R.id.weather_status_image);
+        textViewTime = (TextView) stub.findViewById(R.id.text_view_time);
+        textViewTempHigh = (TextView) stub.findViewById(R.id.text_view_temp_high);
+        textViewTempLow = (TextView) stub.findViewById(R.id.text_view_temp_low);
+        textViewDate = (TextView) stub.findViewById(R.id.text_view_date);
+        setTime(textViewTime);
+      }
+    });
+
+    //Launch Mobile Sync from here
+    launchMobileWeatherSync();
+
+    //Listen
+    listenForWeather();
+  }
+
+  private void listenForWeather() {
+    RxWear.Data.listen()
+        .compose(DataEventGetDataMap.filterByPathAndType("/weather", DataEvent.TYPE_CHANGED))
+        .subscribe(new Action1<DataMap>() {
+          @Override public void call(DataMap dataMap) {
+            String high = dataMap.getString("temp_high");
+            String low = dataMap.getString("temp_low");
+            textViewTempHigh.setText(high);
+            textViewTempLow.setText(low);
+            String date = dataMap.getString("date");
+            textViewDate.setText(date);
           }
         });
+  }
 
+  private void launchMobileWeatherSync() {
     RxWear.Message.SendDataMap.toAllRemoteNodes(START_ACTIVITY_PATH)
         .putDouble("time", System.currentTimeMillis())
         .putString("message", "send_sync")
@@ -66,49 +96,27 @@ public class MainActivity extends Activity
             Log.e("Wear", "Send");
           }
         });
-
-    mGoogleApiClient = new GoogleApiClient.Builder(this).addApi(Wearable.API).addConnectionCallbacks(this).addOnConnectionFailedListener(this).build();
-    //trigger a sync from here!
-    //send a message to device to get the latest weather data
-    //setupVoiceTranscription();
   }
 
-  private static final String START_ACTIVITY_PATH = "/start-activity";
-
-  private void sendStartActivityMessage(String node) {
-    Wearable.MessageApi.sendMessage(mGoogleApiClient, node, START_ACTIVITY_PATH,
-        new byte[0]).setResultCallback(new ResultCallback<MessageApi.SendMessageResult>() {
-          @Override
-          public void onResult(MessageApi.SendMessageResult sendMessageResult) {
-            if (!sendMessageResult.getStatus().isSuccess()) {
-              Log.e("Wear", "Failed to send message with status code: "
-                  + sendMessageResult.getStatus().getStatusCode());
-            }
-          }
-        });
-  }
-
-  private void setupVoiceTranscription() {
-    Observable.create(
-        new Observable.OnSubscribe<CapabilityApi.GetCapabilityResult>() {
-          @Override public void call(
-              Subscriber<? super CapabilityApi.GetCapabilityResult> subscriber) {
-            CapabilityApi.GetCapabilityResult result =
-                Wearable.CapabilityApi.getCapability(mGoogleApiClient,
-                    SYNC_CAPABILITY, CapabilityApi.FILTER_REACHABLE).await();
-            subscriber.onNext(result);
-            subscriber.onCompleted();
-          }
-        })
-        .subscribeOn(Schedulers.newThread())
-        .observeOn(AndroidSchedulers.mainThread())
-        .subscribe(new Action1<CapabilityApi.GetCapabilityResult>() {
-          @Override public void call(CapabilityApi.GetCapabilityResult result) {
-            updateSyncCapability(result.getCapability());
-            Log.e("Wear", "Done with the await stuff!");
-            requestSync();
-          }
-        });
+  private void setTime(final TextView textViewTime) {
+    Observable.create(new Observable.OnSubscribe<String>() {
+      @Override public void call(Subscriber<? super String> subscriber) {
+        Calendar c = Calendar.getInstance();
+        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
+        final String strDate = sdf.format(c.getTime());
+        subscriber.onNext(strDate);
+        subscriber.onCompleted();
+      }
+    }).observeOn(AndroidSchedulers.mainThread()).subscribe(new Action1<String>() {
+      @Override public void call(String s) {
+        textViewTime.setText(s);
+      }
+    });
+    Observable.just("").delay(1, TimeUnit.MINUTES).subscribe(new Action1<Object>() {
+      @Override public void call(Object o) {
+        setTime(textViewTime);
+      }
+    });
   }
 
   @Override protected void onDestroy() {
@@ -119,89 +127,30 @@ public class MainActivity extends Activity
     }
   }
 
-  private String transcriptionNodeId = null;
-
-  private void updateSyncCapability(CapabilityInfo capabilityInfo) {
-    Set<Node> connectedNodes = capabilityInfo.getNodes();
-
-    transcriptionNodeId = pickBestNodeId(connectedNodes);
-  }
-
-  //Picks the closest node
-  private String pickBestNodeId(Set<Node> nodes) {
-    String bestNodeId = null;
-    // Find a nearby node or pick one arbitrarily
-    for (Node node : nodes) {
-      if (node.isNearby()) {
-        return node.getId();
-      }
-      bestNodeId = node.getId();
-    }
-    return bestNodeId;
-  }
-
-  private void requestSync() {
-    if (transcriptionNodeId != null) {
-      Log.e("Wear", transcriptionNodeId);
-    } else {
-      // Unable to retrieve node with transcription capability
-      Log.e("Wear", "Unable to find node with capability!");
-    }
-  }
-
-  @Override protected void onResume() {
-    super.onResume();
-    mGoogleApiClient.connect();
-  }
-
-  @Override protected void onPause() {
-    super.onPause();
-    Wearable.DataApi.removeListener(mGoogleApiClient, this);
-    mGoogleApiClient.disconnect();
-  }
-
-  @Override public void onConnected(@Nullable Bundle bundle) {
-    Wearable.DataApi.addListener(mGoogleApiClient, this);
-  }
-
-  @Override public void onConnectionSuspended(int cause) {
-    Log.e("Wear",
-        "onConnectionSuspended(): Connection to Google API client was suspended");
-  }
-
-  @Override public void onConnectionFailed(ConnectionResult result) {
-    Log.e("Wear",
-        "onConnectionFailed(): Failed to connect, with result: " + result);
-  }
-
   @Override public void onDataChanged(DataEventBuffer dataEvents) {
-    Log.e("Wear", "DataChange!!");
     for (DataEvent event : dataEvents) {
       if (event.getType() == DataEvent.TYPE_CHANGED) {
         String path = event.getDataItem().getUri().getPath();
         if ("/image".equals(path)) {
 
-          DataMapItem dataMapItem =
-              DataMapItem.fromDataItem(event.getDataItem());
+          DataMapItem dataMapItem = DataMapItem.fromDataItem(event.getDataItem());
 
-          final Asset photoAsset = dataMapItem.getDataMap().getAsset("weather");
+          final Asset photoAsset = dataMapItem.getDataMap().getAsset("icon");
           // Loads image on background thread.
-          Observable<Bitmap> myObservable =
-              Observable.create(new Observable.OnSubscribe<Bitmap>() {
-                @Override
-                public void call(Subscriber<? super Bitmap> subscriber) {
-                  InputStream assetInputStream =
-                      Wearable.DataApi.getFdForAsset(mGoogleApiClient,
-                          photoAsset).await().getInputStream();
+          Observable<Bitmap> myObservable = Observable.create(new Observable.OnSubscribe<Bitmap>() {
+            @Override public void call(Subscriber<? super Bitmap> subscriber) {
+              InputStream assetInputStream =
+                  Wearable.DataApi.getFdForAsset(mGoogleApiClient, photoAsset)
+                      .await()
+                      .getInputStream();
 
-                  if (assetInputStream == null) {
-                    subscriber.onError(new Exception("Unknown Asset"));
-                  }
-                  subscriber.onNext(
-                      BitmapFactory.decodeStream(assetInputStream));
-                  subscriber.onCompleted();
-                }
-              });
+              if (assetInputStream == null) {
+                subscriber.onError(new Exception("Unknown Asset"));
+              }
+              subscriber.onNext(BitmapFactory.decodeStream(assetInputStream));
+              subscriber.onCompleted();
+            }
+          });
 
           myObservable.subscribeOn(Schedulers.newThread())
               .observeOn(AndroidSchedulers.mainThread())
@@ -220,5 +169,23 @@ public class MainActivity extends Activity
         }
       }
     }
+  }
+
+  @Override public void onConnected(@Nullable Bundle bundle) {
+    Wearable.DataApi.addListener(mGoogleApiClient, this);
+  }
+
+  @Override public void onConnectionSuspended(int i) {
+
+  }
+
+  @Override protected void onPause() {
+    super.onPause();
+    Wearable.DataApi.removeListener(mGoogleApiClient, this);
+  }
+
+  @Override protected void onResume() {
+    super.onResume();
+    mGoogleApiClient.connect();
   }
 }
