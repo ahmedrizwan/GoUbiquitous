@@ -7,7 +7,6 @@ import android.net.Uri;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
 import android.util.Log;
-import android.widget.Toast;
 import com.example.android.sunshine.app.data.WeatherContract;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
@@ -47,7 +46,6 @@ public class DataLayerListenerService extends WearableListenerService
       //startIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
       //startActivity(startIntent);
       //Trigger Sync
-      Toast.makeText(this, "Hello", Toast.LENGTH_SHORT).show();
       // Sort order:  Ascending, by date.
       String sortOrder = WeatherContract.WeatherEntry.COLUMN_DATE + " ASC";
 
@@ -80,7 +78,7 @@ public class DataLayerListenerService extends WearableListenerService
       sendPhoto(data);
     }catch (Exception e){
       RxWear.Data.PutDataMap.to("/error")
-          .putString("message", "Please connect with Phone!")
+          .putString("message", "Unable to fetch weather!")
           .toObservable()
           .subscribe(new Action1<DataItem>() {
             @Override public void call(DataItem dataItem) {

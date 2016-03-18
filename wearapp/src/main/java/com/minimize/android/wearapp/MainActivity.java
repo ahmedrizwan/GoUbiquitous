@@ -64,6 +64,16 @@ public class MainActivity extends Activity
       }
     });
 
+    RxWear.Data.listen()
+        .compose(DataEventGetDataMap.filterByPathAndType("/error", DataEvent.TYPE_CHANGED))
+        .subscribe(new Action1<DataMap>() {
+          @Override public void call(DataMap dataMap) {
+            String message = dataMap.getString("message");
+            textViewDate.setText(message);
+
+          }
+        });
+
     //Launch Mobile Sync from here
     launchMobileWeatherSync();
 

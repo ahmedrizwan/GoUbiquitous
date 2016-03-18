@@ -19,9 +19,9 @@ android {
     }
   }
 
-  //  buildTypes.each {
-  //    it.buildConfigField 'String', 'OPEN_WEATHER_MAP_API_KEY', "5bcd598bf0c75ca5eb6939875e38031c"
-  //  }
+  buildTypes.each {
+    it.buildConfigField 'String', 'OPEN_WEATHER_MAP_API_KEY', ""
+  }
 }
 
 dependencies {
