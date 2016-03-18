@@ -26,4 +26,5 @@ dependencies {
   compile 'io.reactivex:rxandroid:1.1.0'
   compile 'io.reactivex:rxjava:1.1.0'
   compile 'com.patloew.rxwear:rxwear:1.0.0'
+  compile 'com.android.support:design:23.2.1'
 }

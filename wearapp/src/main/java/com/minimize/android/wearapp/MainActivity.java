@@ -5,8 +5,10 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
+import android.support.design.widget.Snackbar;
 import android.support.wearable.view.WatchViewStub;
 import android.util.Log;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -44,6 +46,8 @@ public class MainActivity extends Activity
   private CompositeSubscription subscription = new CompositeSubscription();
   private GoogleApiClient mGoogleApiClient;
 
+  private Snackbar snackbar;
+
   @Override protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
@@ -60,6 +64,26 @@ public class MainActivity extends Activity
         textViewTempHigh = (TextView) stub.findViewById(R.id.text_view_temp_high);
         textViewTempLow = (TextView) stub.findViewById(R.id.text_view_temp_low);
         textViewDate = (TextView) stub.findViewById(R.id.text_view_date);
+        snackbar = Snackbar.make(stub.getRootView(), "", Snackbar.LENGTH_INDEFINITE)
+            .setAction("Retry", new View.OnClickListener() {
+              @Override public void onClick(View v) {
+                RxWear.Data.listen()
+                    .compose(
+                        DataEventGetDataMap.filterByPathAndType("/error", DataEvent.TYPE_CHANGED))
+                    .subscribe(new Action1<DataMap>() {
+                      @Override public void call(DataMap dataMap) {
+                        String message = dataMap.getString("message");
+                        textViewDate.setText(message);
+                      }
+                    });
+
+                //Launch Mobile Sync from here
+                getWeatherDataFromMobile();
+
+                //Listen
+                listenForWeather();
+              }
+            });
         setTime(textViewTime);
       }
     });
@@ -70,12 +94,12 @@ public class MainActivity extends Activity
           @Override public void call(DataMap dataMap) {
             String message = dataMap.getString("message");
             textViewDate.setText(message);
-
+            snackbar.show();
           }
         });
 
     //Launch Mobile Sync from here
-    launchMobileWeatherSync();
+    getWeatherDataFromMobile();
 
     //Listen
     listenForWeather();
@@ -92,18 +116,43 @@ public class MainActivity extends Activity
             textViewTempLow.setText(low);
             String date = dataMap.getString("date");
             textViewDate.setText(date);
+            snackbar.dismiss();
           }
         });
   }
 
-  private void launchMobileWeatherSync() {
+  private void getWeatherDataFromMobile() {
     RxWear.Message.SendDataMap.toAllRemoteNodes(START_ACTIVITY_PATH)
         .putDouble("time", System.currentTimeMillis())
         .putString("message", "send_sync")
         .toObservable()
         .subscribe(new Action1<Integer>() {
           @Override public void call(Integer integer) {
-            Log.e("Wear", "Send");
+            Log.e("Wear", integer.toString());
+          }
+        });
+
+    //Timer for checking if I got any message back
+    Observable.create(new Observable.OnSubscribe<Object>() {
+      @Override public void call(Subscriber<? super Object> subscriber) {
+        try {
+          Thread.sleep(3000);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        subscriber.onNext(null);
+        subscriber.onCompleted();
+      }
+    })
+        .subscribeOn(Schedulers.newThread())
+        .observeOn(AndroidSchedulers.mainThread())
+        .subscribe(new Action1<Object>() {
+          @Override public void call(Object o) {
+            String text = "Please connect with Phone!";
+            if (textViewDate.getText().equals("")) {
+              textViewDate.setText(text);
+              snackbar.show();
+            }
           }
         });
   }
@@ -142,7 +191,7 @@ public class MainActivity extends Activity
       if (event.getType() == DataEvent.TYPE_CHANGED) {
         String path = event.getDataItem().getUri().getPath();
         if ("/image".equals(path)) {
-
+          snackbar.dismiss();
           DataMapItem dataMapItem = DataMapItem.fromDataItem(event.getDataItem());
 
           final Asset photoAsset = dataMapItem.getDataMap().getAsset("icon");
