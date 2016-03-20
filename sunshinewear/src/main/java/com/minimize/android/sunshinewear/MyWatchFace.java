@@ -35,8 +35,10 @@ import android.support.wearable.watchface.WatchFaceStyle;
 import android.text.format.Time;
 import android.view.SurfaceHolder;
 import android.view.WindowInsets;
-
 import java.lang.ref.WeakReference;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Locale;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
@@ -45,13 +47,14 @@ import java.util.concurrent.TimeUnit;
  * low-bit ambient mode, the text is drawn without anti-aliasing in ambient mode.
  */
 public class MyWatchFace extends CanvasWatchFaceService {
-  private static final Typeface NORMAL_TYPEFACE = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL);
+  private static final Typeface NORMAL_TYPEFACE =
+      Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL);
 
   /**
    * Update rate in milliseconds for interactive mode. We update once a second since seconds are
    * displayed in interactive mode.
    */
-  private static final long INTERACTIVE_UPDATE_RATE_MS = TimeUnit.SECONDS.toMillis(1);
+  private static final long INTERACTIVE_UPDATE_RATE_MS = TimeUnit.SECONDS.toMillis(1000);
 
   /**
    * Handler message id for updating the time periodically in interactive mode.
@@ -85,7 +88,11 @@ public class MyWatchFace extends CanvasWatchFaceService {
     final Handler mUpdateTimeHandler = new EngineHandler(this);
     boolean mRegisteredTimeZoneReceiver = false;
     Paint mBackgroundPaint;
-    Paint mTextPaint;
+    Paint mTimePaint;
+    Paint mDatePaint;
+    Paint mHighPaint;
+    Paint mLowPaint;
+
     boolean mAmbient;
     Time mTime;
     final BroadcastReceiver mTimeZoneReceiver = new BroadcastReceiver() {
@@ -104,11 +111,13 @@ public class MyWatchFace extends CanvasWatchFaceService {
      * disable anti-aliasing in ambient mode.
      */
     boolean mLowBitAmbient;
+    private String monthname;
 
     @Override public void onCreate(SurfaceHolder holder) {
       super.onCreate(holder);
 
-      setWatchFaceStyle(new WatchFaceStyle.Builder(MyWatchFace.this).setCardPeekMode(WatchFaceStyle.PEEK_MODE_VARIABLE)
+      setWatchFaceStyle(new WatchFaceStyle.Builder(MyWatchFace.this).setCardPeekMode(
+          WatchFaceStyle.PEEK_MODE_VARIABLE)
           .setBackgroundVisibility(WatchFaceStyle.BACKGROUND_VISIBILITY_INTERRUPTIVE)
           .setShowSystemUiTime(false)
           .setAcceptsTapEvents(true)
@@ -117,12 +126,19 @@ public class MyWatchFace extends CanvasWatchFaceService {
       mYOffset = resources.getDimension(R.dimen.digital_y_offset);
 
       mBackgroundPaint = new Paint();
-      mBackgroundPaint.setColor(ContextCompat.getColor(getApplicationContext(),R.color.primary));
+      mBackgroundPaint.setColor(ContextCompat.getColor(getApplicationContext(), R.color.primary));
 
-      mTextPaint = new Paint();
-      mTextPaint = createTextPaint(resources.getColor(R.color.digital_text));
+      mTimePaint = new Paint();
+      mTimePaint = createTextPaint(Color.WHITE);
+
+      mDatePaint = new Paint();
+      mDatePaint = createTextPaint(Color.WHITE);
 
       mTime = new Time();
+      Calendar cal = Calendar.getInstance();
+      SimpleDateFormat month_date = new SimpleDateFormat("MMM", Locale.US);
+      monthname = month_date.format(cal.getTime());
+      monthname = "Today, " + monthname + " " + cal.get(Calendar.DAY_OF_MONTH);
     }
 
     @Override public void onDestroy() {
@@ -179,10 +195,14 @@ public class MyWatchFace extends CanvasWatchFaceService {
       // Load resources that have alternate values for round watches.
       Resources resources = MyWatchFace.this.getResources();
       boolean isRound = insets.isRound();
-      mXOffset = resources.getDimension(isRound ? R.dimen.digital_x_offset_round : R.dimen.digital_x_offset);
-      float textSize = resources.getDimension(isRound ? R.dimen.digital_text_size_round : R.dimen.digital_text_size);
-
-      mTextPaint.setTextSize(textSize);
+      mXOffset = resources.getDimension(
+          isRound ? R.dimen.digital_x_offset_round : R.dimen.digital_x_offset);
+      float timeSize = resources.getDimension(
+          isRound ? R.dimen.digital_text_size_round : R.dimen.digital_text_size);
+      float dateSize = resources.getDimension(
+          isRound ? R.dimen.digital_date_size_round : R.dimen.digital_date_size);
+      mTimePaint.setTextSize(timeSize);
+      mDatePaint.setTextSize(dateSize);
     }
 
     @Override public void onPropertiesChanged(Bundle properties) {
@@ -200,7 +220,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
       if (mAmbient != inAmbientMode) {
         mAmbient = inAmbientMode;
         if (mLowBitAmbient) {
-          mTextPaint.setAntiAlias(!inAmbientMode);
+          mTimePaint.setAntiAlias(!inAmbientMode);
         }
         invalidate();
       }
@@ -226,7 +246,8 @@ public class MyWatchFace extends CanvasWatchFaceService {
         case TAP_TYPE_TAP:
           // The user has completed the tap gesture.
           mTapCount++;
-          mBackgroundPaint.setColor(resources.getColor(mTapCount % 2 == 0 ? R.color.background : R.color.background2));
+          mBackgroundPaint.setColor(
+              resources.getColor(mTapCount % 2 == 0 ? R.color.background : R.color.background2));
           break;
       }
       invalidate();
@@ -240,13 +261,13 @@ public class MyWatchFace extends CanvasWatchFaceService {
         canvas.drawRect(0, 0, bounds.width(), bounds.height(), mBackgroundPaint);
       }
 
-      // Draw H:MM in ambient mode or H:MM:SS in interactive mode.
       mTime.setToNow();
-      String text = mAmbient ? String.format("%d:%02d", mTime.hour, mTime.minute)
-          : String.format("%d:%02d", mTime.hour, mTime.minute);
-      int xPos = (int) ((canvas.getWidth() / 2) - (mTextPaint.measureText(text)/2));
 
-      canvas.drawText(text, xPos, mYOffset, mTextPaint);
+      String text = String.format("%02d:%02d", mTime.hour, mTime.minute);
+      int xPos = (int) ((canvas.getWidth() / 2) - (mTimePaint.measureText(text) / 2));
+      int xDate = (int) (canvas.getWidth() / 2 - mDatePaint.measureText(monthname) / 2);
+      canvas.drawText(monthname, xDate, mYOffset - mTimePaint.getTextSize(), mDatePaint);
+      canvas.drawText(text, xPos, mYOffset, mTimePaint);
     }
 
     /**
