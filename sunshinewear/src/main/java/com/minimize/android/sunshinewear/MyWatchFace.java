@@ -21,6 +21,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -111,7 +113,11 @@ public class MyWatchFace extends CanvasWatchFaceService {
      * disable anti-aliasing in ambient mode.
      */
     boolean mLowBitAmbient;
-    private String monthname;
+    private String dateString;
+    private String highString;
+    private String lowString;
+    private Bitmap bitmap;
+
 
     @Override public void onCreate(SurfaceHolder holder) {
       super.onCreate(holder);
@@ -134,11 +140,24 @@ public class MyWatchFace extends CanvasWatchFaceService {
       mDatePaint = new Paint();
       mDatePaint = createTextPaint(Color.WHITE);
 
+      mHighPaint = new Paint();
+      mHighPaint = createTextPaint(Color.WHITE);
+
+      mLowPaint = new Paint();
+      mLowPaint = createTextPaint(Color.WHITE);
+
       mTime = new Time();
       Calendar cal = Calendar.getInstance();
       SimpleDateFormat month_date = new SimpleDateFormat("MMM", Locale.US);
-      monthname = month_date.format(cal.getTime());
-      monthname = "Today, " + monthname + " " + cal.get(Calendar.DAY_OF_MONTH);
+      dateString = month_date.format(cal.getTime());
+      dateString = "Today, " + dateString + " " + cal.get(Calendar.DAY_OF_MONTH);
+      String suffix = "\u00B0";
+
+      highString = "15" + suffix;
+      lowString = "4" + suffix;
+      bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.art_clear);
+      //Trigger weather info from here!
+
     }
 
     @Override public void onDestroy() {
@@ -149,7 +168,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
     private Paint createTextPaint(int textColor) {
       Paint paint = new Paint();
       paint.setColor(textColor);
-      paint.setTypeface(NORMAL_TYPEFACE);
+      paint.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
       paint.setAntiAlias(true);
       return paint;
     }
@@ -203,6 +222,9 @@ public class MyWatchFace extends CanvasWatchFaceService {
           isRound ? R.dimen.digital_date_size_round : R.dimen.digital_date_size);
       mTimePaint.setTextSize(timeSize);
       mDatePaint.setTextSize(dateSize);
+      mHighPaint.setTextSize(timeSize);
+      mLowPaint.setTextSize(dateSize);
+
     }
 
     @Override public void onPropertiesChanged(Bundle properties) {
@@ -264,10 +286,20 @@ public class MyWatchFace extends CanvasWatchFaceService {
       mTime.setToNow();
 
       String text = String.format("%02d:%02d", mTime.hour, mTime.minute);
-      int xPos = (int) ((canvas.getWidth() / 2) - (mTimePaint.measureText(text) / 2));
-      int xDate = (int) (canvas.getWidth() / 2 - mDatePaint.measureText(monthname) / 2);
-      canvas.drawText(monthname, xDate, mYOffset - mTimePaint.getTextSize(), mDatePaint);
+
+      int middle = canvas.getWidth() / 2;
+      int xPos = (int) (middle - (mTimePaint.measureText(text) / 2));
+      int xDate = (int) (middle - mDatePaint.measureText(dateString) / 2);
+      float timeHeight = mTimePaint.getTextSize();
+      canvas.drawText(dateString, xDate, mYOffset - timeHeight, mDatePaint);
       canvas.drawText(text, xPos, mYOffset, mTimePaint);
+      final float yHigh = mYOffset + timeHeight;
+      canvas.drawText(highString, middle - mHighPaint.measureText(highString), yHigh, mHighPaint);
+      canvas.drawText(lowString, middle - mLowPaint.measureText(lowString),
+          yHigh + mLowPaint.getTextSize(), mLowPaint);
+
+      canvas.drawBitmap(bitmap, middle, mYOffset, mBackgroundPaint);
+
     }
 
     /**
