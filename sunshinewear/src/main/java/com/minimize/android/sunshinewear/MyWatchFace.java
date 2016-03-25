@@ -25,6 +25,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
@@ -35,6 +36,7 @@ import android.support.v4.content.ContextCompat;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
 import android.text.format.Time;
+import android.view.Gravity;
 import android.view.SurfaceHolder;
 import android.view.WindowInsets;
 import java.lang.ref.WeakReference;
@@ -118,7 +120,6 @@ public class MyWatchFace extends CanvasWatchFaceService {
     private String lowString;
     private Bitmap bitmap;
 
-
     @Override public void onCreate(SurfaceHolder holder) {
       super.onCreate(holder);
 
@@ -126,6 +127,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
           WatchFaceStyle.PEEK_MODE_VARIABLE)
           .setBackgroundVisibility(WatchFaceStyle.BACKGROUND_VISIBILITY_INTERRUPTIVE)
           .setShowSystemUiTime(false)
+          .setHotwordIndicatorGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL)
           .setAcceptsTapEvents(true)
           .build());
       Resources resources = MyWatchFace.this.getResources();
@@ -156,8 +158,24 @@ public class MyWatchFace extends CanvasWatchFaceService {
       highString = "15" + suffix;
       lowString = "4" + suffix;
       bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.art_clear);
+
+      bitmap = getResizedBitmap(bitmap, 80, 80);
       //Trigger weather info from here!
 
+    }
+
+    public Bitmap getResizedBitmap(Bitmap bm, int newHeight, int newWidth) {
+      int width = bm.getWidth();
+      int height = bm.getHeight();
+      float scaleWidth = ((float) newWidth) / width;
+      float scaleHeight = ((float) newHeight) / height;
+      // create a matrix for the manipulation
+      Matrix matrix = new Matrix();
+      // resize the bit map
+      matrix.postScale(scaleWidth, scaleHeight);
+      // recreate the new Bitmap
+      Bitmap resizedBitmap = Bitmap.createBitmap(bm, 0, 0, width, height, matrix, false);
+      return resizedBitmap;
     }
 
     @Override public void onDestroy() {
@@ -216,6 +234,8 @@ public class MyWatchFace extends CanvasWatchFaceService {
       boolean isRound = insets.isRound();
       mXOffset = resources.getDimension(
           isRound ? R.dimen.digital_x_offset_round : R.dimen.digital_x_offset);
+      mYOffset = resources.getDimension(
+          isRound ? R.dimen.digital_y_offset_round : R.dimen.digital_y_offset);
       float timeSize = resources.getDimension(
           isRound ? R.dimen.digital_text_size_round : R.dimen.digital_text_size);
       float dateSize = resources.getDimension(
@@ -224,7 +244,6 @@ public class MyWatchFace extends CanvasWatchFaceService {
       mDatePaint.setTextSize(dateSize);
       mHighPaint.setTextSize(timeSize);
       mLowPaint.setTextSize(dateSize);
-
     }
 
     @Override public void onPropertiesChanged(Bundle properties) {
@@ -275,6 +294,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
       invalidate();
     }
 
+
     @Override public void onDraw(Canvas canvas, Rect bounds) {
       // Draw the background.
       if (isInAmbientMode()) {
@@ -294,12 +314,12 @@ public class MyWatchFace extends CanvasWatchFaceService {
       canvas.drawText(dateString, xDate, mYOffset - timeHeight, mDatePaint);
       canvas.drawText(text, xPos, mYOffset, mTimePaint);
       final float yHigh = mYOffset + timeHeight;
+
       canvas.drawText(highString, middle - mHighPaint.measureText(highString), yHigh, mHighPaint);
       canvas.drawText(lowString, middle - mLowPaint.measureText(lowString),
           yHigh + mLowPaint.getTextSize(), mLowPaint);
 
       canvas.drawBitmap(bitmap, middle, mYOffset, mBackgroundPaint);
-
     }
 
     /**
