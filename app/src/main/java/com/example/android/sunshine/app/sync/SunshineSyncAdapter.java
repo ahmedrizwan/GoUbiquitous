@@ -35,6 +35,7 @@ import com.example.android.sunshine.app.R;
 import com.example.android.sunshine.app.Utility;
 import com.example.android.sunshine.app.data.WeatherContract;
 import com.example.android.sunshine.app.muzei.WeatherMuzeiSource;
+import com.patloew.rxwear.RxWear;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,11 +44,13 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Date;
 import java.util.Vector;
 import java.util.concurrent.ExecutionException;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import rx.functions.Action1;
 
 public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
   public final String LOG_TAG = SunshineSyncAdapter.class.getSimpleName();
@@ -85,12 +88,13 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
 
   public SunshineSyncAdapter(Context context, boolean autoInitialize) {
     super(context, autoInitialize);
+    RxWear.init(context);
   }
 
   @Override public void onPerformSync(Account account, Bundle extras, String authority,
       ContentProviderClient provider, SyncResult syncResult) {
 
-    Log.d(LOG_TAG, "Starting sync");
+    Log.e(LOG_TAG, "Starting sync");
     String locationQuery = Utility.getPreferredLocation(getContext());
 
     // These two need to be declared outside the try/catch
@@ -122,7 +126,7 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
           .appendQueryParameter(FORMAT_PARAM, format)
           .appendQueryParameter(UNITS_PARAM, units)
           .appendQueryParameter(DAYS_PARAM, Integer.toString(numDays))
-          .appendQueryParameter(APPID_PARAM, BuildConfig.OPEN_WEATHER_MAP_API_KEY)
+          .appendQueryParameter(APPID_PARAM,  BuildConfig.OPEN_WEATHER_MAP_API_KEY)
           .build();
 
       URL url = new URL(builtUri.toString());
@@ -177,6 +181,9 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
         }
       }
     }
+    //Trigger sync so that data gets sent to wear
+    sendMessageToWearForSync();
+
     return;
   }
 
@@ -629,5 +636,21 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
     SharedPreferences.Editor spe = sp.edit();
     spe.putInt(c.getString(R.string.pref_location_status_key), locationStatus);
     spe.commit();
+  }
+
+  private void sendMessageToWearForSync() {
+    RxWear.Message.SendDataMap.toAllRemoteNodes("/wear_trigger_sync")
+        .putDouble("time", new Date().getTime())
+        .putString("message", "send_sync")
+        .toObservable()
+        .subscribe(new Action1<Integer>() {
+          @Override public void call(Integer integer) {
+            Log.e("Wear", integer.toString());
+          }
+        }, new Action1<Throwable>() {
+          @Override public void call(Throwable throwable) {
+            Log.e("Wear", "getWeatherData: " + throwable.getMessage());
+          }
+        });
   }
 }

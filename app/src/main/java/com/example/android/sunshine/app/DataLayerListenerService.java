@@ -28,37 +28,44 @@ import rx.functions.Action1;
  */
 public class DataLayerListenerService extends WearableListenerService
     implements Loader.OnLoadCompleteListener<Cursor> {
-  private static final String START_ACTIVITY_PATH = "/start-activity";
+  public static final String START_ACTIVITY_PATH = "/start-activity";
   GoogleApiClient mGoogleApiClient;
   private CursorLoader mCursorLoader;
 
+  public static DataLayerListenerService instance;
+
   @Override public void onCreate() {
     super.onCreate();
+    instance = this;
     RxWear.init(this);
     mGoogleApiClient = new GoogleApiClient.Builder(this).addApi(Wearable.API).build();
     mGoogleApiClient.connect();
   }
 
+  public static DataLayerListenerService getInstance(){
+    return instance;
+  }
+
   @Override public void onMessageReceived(MessageEvent messageEvent) {
     // Check to see if the message is to start an activity
+    Log.e("Mobile", "onMessageReceived");
     if (messageEvent.getPath().equals(START_ACTIVITY_PATH)) {
-      //Intent startIntent = new Intent(this, TestActivity.class);
-      //startIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-      //startActivity(startIntent);
-      //Trigger Sync
-      // Sort order:  Ascending, by date.
-      String sortOrder = WeatherContract.WeatherEntry.COLUMN_DATE + " ASC";
-
-      String locationSetting = Utility.getPreferredLocation(this);
-      Uri weatherForLocationUri =
-          WeatherContract.WeatherEntry.buildWeatherLocationWithStartDate(locationSetting,
-              System.currentTimeMillis());
-      mCursorLoader =
-          new CursorLoader(this, weatherForLocationUri, ForecastFragment.FORECAST_COLUMNS, null,
-              null, sortOrder);
-      mCursorLoader.registerListener(0, this);
-      mCursorLoader.startLoading();
+      syncWithWear();
     }
+  }
+
+  public void syncWithWear() {
+    String sortOrder = WeatherContract.WeatherEntry.COLUMN_DATE + " ASC";
+
+    String locationSetting = Utility.getPreferredLocation(this);
+    Uri weatherForLocationUri =
+        WeatherContract.WeatherEntry.buildWeatherLocationWithStartDate(locationSetting,
+            System.currentTimeMillis());
+    mCursorLoader =
+        new CursorLoader(this, weatherForLocationUri, ForecastFragment.FORECAST_COLUMNS, null,
+            null, sortOrder);
+    mCursorLoader.registerListener(0, this);
+    mCursorLoader.startLoading();
   }
 
   @Override public void onDestroy() {
@@ -76,7 +83,7 @@ public class DataLayerListenerService extends WearableListenerService
       data.moveToFirst();
       sendWeatherData(data);
       sendPhoto(data);
-    }catch (Exception e){
+    } catch (Exception e) {
       RxWear.Data.PutDataMap.to("/error")
           .putString("message", "Unable to fetch weather!")
           .toObservable()
@@ -108,17 +115,13 @@ public class DataLayerListenerService extends WearableListenerService
     String highString = Utility.formatTemperature(this, high);
     double low = data.getDouble(ForecastFragment.COL_WEATHER_MIN_TEMP);
     String lowString = Utility.formatTemperature(this, low);
-    // Read date from cursor
-    long dateInMillis = data.getLong(ForecastFragment.COL_WEATHER_DATE);
 
-    // Find TextView and set formatted date on it
-    String dayString = Utility.getFriendlyDayString(this, dateInMillis, true);
+    //Toast.makeText(DataLayerListenerService.this, "Sending Data", Toast.LENGTH_SHORT).show();
 
     RxWear.Data.PutDataMap.to("/weather")
         .putString("temp_high", highString)
-        .putString("temp_low",lowString)
+        .putString("temp_low", lowString)
         .putDouble("time", new Date().getTime())
-        .putString("date", dayString)
         .toObservable()
         .subscribe(new Action1<DataItem>() {
           @Override public void call(DataItem dataItem) {

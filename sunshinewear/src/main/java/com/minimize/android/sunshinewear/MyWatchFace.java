@@ -32,19 +32,38 @@ import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
 import android.text.format.Time;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.SurfaceHolder;
 import android.view.WindowInsets;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.wearable.Asset;
+import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.DataEvent;
+import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataMap;
+import com.google.android.gms.wearable.DataMapItem;
+import com.google.android.gms.wearable.Wearable;
+import com.patloew.rxwear.RxWear;
+import com.patloew.rxwear.transformers.DataEventGetDataMap;
+import com.patloew.rxwear.transformers.MessageEventGetDataMap;
+import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Locale;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+import rx.Observable;
+import rx.Subscriber;
+import rx.android.schedulers.AndroidSchedulers;
+import rx.functions.Action1;
+import rx.schedulers.Schedulers;
 
 /**
  * Digital watch face with seconds. In ambient mode, the seconds aren't displayed. On devices with
@@ -88,7 +107,8 @@ public class MyWatchFace extends CanvasWatchFaceService {
     }
   }
 
-  private class Engine extends CanvasWatchFaceService.Engine {
+  private class Engine extends CanvasWatchFaceService.Engine
+      implements GoogleApiClient.ConnectionCallbacks, DataApi.DataListener {
     final Handler mUpdateTimeHandler = new EngineHandler(this);
     boolean mRegisteredTimeZoneReceiver = false;
     Paint mBackgroundPaint;
@@ -96,6 +116,8 @@ public class MyWatchFace extends CanvasWatchFaceService {
     Paint mDatePaint;
     Paint mHighPaint;
     Paint mLowPaint;
+
+    private GoogleApiClient mGoogleApiClient;
 
     boolean mAmbient;
     Time mTime;
@@ -115,13 +137,79 @@ public class MyWatchFace extends CanvasWatchFaceService {
      * disable anti-aliasing in ambient mode.
      */
     boolean mLowBitAmbient;
-    private String dateString;
-    private String highString;
-    private String lowString;
-    private Bitmap bitmap;
+    private String dateString = "";
+    private String highString = "";
+    private String lowString = "";
+    private Bitmap mBitmapWeather;
+
+    @Override public void onSurfaceDestroyed(SurfaceHolder holder) {
+      super.onSurfaceDestroyed(holder);
+      Wearable.DataApi.removeListener(mGoogleApiClient, this);
+    }
+
+    @Override public void onConnected(@Nullable Bundle bundle) {
+      Wearable.DataApi.addListener(mGoogleApiClient, this);
+    }
+
+    @Override public void onConnectionSuspended(int i) {
+      Wearable.DataApi.removeListener(mGoogleApiClient, this);
+    }
+
+    @Override public void onDataChanged(DataEventBuffer dataEvents) {
+      for (DataEvent event : dataEvents) {
+        if (event.getType() == DataEvent.TYPE_CHANGED) {
+          String path = event.getDataItem().getUri().getPath();
+          if ("/image".equals(path)) {
+            //snackbar.dismiss();
+            DataMapItem dataMapItem = DataMapItem.fromDataItem(event.getDataItem());
+
+            final Asset photoAsset = dataMapItem.getDataMap().getAsset("icon");
+            // Loads image on background thread.
+            Observable<Bitmap> myObservable =
+                Observable.create(new Observable.OnSubscribe<Bitmap>() {
+                  @Override public void call(Subscriber<? super Bitmap> subscriber) {
+                    InputStream assetInputStream =
+                        Wearable.DataApi.getFdForAsset(mGoogleApiClient, photoAsset)
+                            .await()
+                            .getInputStream();
+
+                    if (assetInputStream == null) {
+                      subscriber.onError(new Exception("Unknown Asset"));
+                    }
+                    subscriber.onNext(BitmapFactory.decodeStream(assetInputStream));
+                    subscriber.onCompleted();
+                  }
+                });
+
+            myObservable.subscribeOn(Schedulers.newThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Subscriber<Bitmap>() {
+                  @Override public void onCompleted() {
+                  }
+
+                  @Override public void onError(Throwable e) {
+                    Log.e("Error", e.toString());
+                  }
+
+                  @Override public void onNext(Bitmap bitmap) {
+                    //mImageView.setImageBitmap(mBitmapWeather);
+                    mBitmapWeather = getResizedBitmap(bitmap, 80, 80);
+                    invalidate();
+                  }
+                });
+          }
+        }
+      }
+    }
 
     @Override public void onCreate(SurfaceHolder holder) {
       super.onCreate(holder);
+      RxWear.init(getApplicationContext());
+      mGoogleApiClient =
+          new GoogleApiClient.Builder(getApplicationContext()).addConnectionCallbacks(this)
+              .addApi(Wearable.API)
+              .build();
+      mGoogleApiClient.connect();
 
       setWatchFaceStyle(new WatchFaceStyle.Builder(MyWatchFace.this).setCardPeekMode(
           WatchFaceStyle.PEEK_MODE_VARIABLE)
@@ -130,6 +218,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
           .setHotwordIndicatorGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL)
           .setAcceptsTapEvents(true)
           .build());
+
       Resources resources = MyWatchFace.this.getResources();
       mYOffset = resources.getDimension(R.dimen.digital_y_offset);
 
@@ -153,15 +242,87 @@ public class MyWatchFace extends CanvasWatchFaceService {
       SimpleDateFormat month_date = new SimpleDateFormat("MMM", Locale.US);
       dateString = month_date.format(cal.getTime());
       dateString = "Today, " + dateString + " " + cal.get(Calendar.DAY_OF_MONTH);
-      String suffix = "\u00B0";
+      //String suffix = "\u00B0";
 
-      highString = "15" + suffix;
-      lowString = "4" + suffix;
-      bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.art_clear);
+      //highString = "15" + suffix;
+      //lowString = "4" + suffix;
+      mBitmapWeather = BitmapFactory.decodeResource(getResources(), R.drawable.art_clear);
 
-      bitmap = getResizedBitmap(bitmap, 80, 80);
-      //Trigger weather info from here!
+      mBitmapWeather = getResizedBitmap(mBitmapWeather, 1, 1);
 
+      //Launch Mobile Sync from here
+      getWeatherDataFromMobile();
+
+      //Listen
+      listenForWeather();
+
+
+      RxWear.Message.listen()
+          .compose(MessageEventGetDataMap.filterByPath("/wear_trigger_sync"))
+          .subscribe(new Action1<DataMap>() {
+            @Override public void call(DataMap dataMap) {
+              getWeatherDataFromMobile();
+            }
+          }, new Action1<Throwable>() {
+            @Override public void call(Throwable throwable) {
+              Log.e("Wear", "ListenForWeather: " + throwable.getMessage());
+            }
+          });
+    }
+
+    private void listenForWeather() {
+      RxWear.Data.listen()
+          .compose(DataEventGetDataMap.filterByPathAndType("/weather", DataEvent.TYPE_CHANGED))
+          .subscribe(new Action1<DataMap>() {
+            @Override public void call(DataMap dataMap) {
+              highString = dataMap.getString("temp_high");
+              lowString = dataMap.getString("temp_low");
+              Log.e("Wear", "High: " + highString + " and Low:" + lowString);
+              invalidate();
+            }
+          }, new Action1<Throwable>() {
+            @Override public void call(Throwable throwable) {
+              Log.e("Wear", "ListenForWeather: " + throwable.getMessage());
+            }
+          });
+    }
+
+    private static final String START_ACTIVITY_PATH = "/start-activity";
+
+    private void getWeatherDataFromMobile() {
+      RxWear.Message.SendDataMap.toAllRemoteNodes(START_ACTIVITY_PATH)
+          .putDouble("time", System.currentTimeMillis())
+          .putString("message", "send_sync")
+          .toObservable()
+          .subscribe(new Action1<Integer>() {
+            @Override public void call(Integer integer) {
+              Log.e("Wear", integer.toString());
+            }
+          }, new Action1<Throwable>() {
+            @Override public void call(Throwable throwable) {
+              Log.e("Wear", "getWeatherData: " + throwable.getMessage());
+            }
+          });
+
+      //Timer for checking if I got any message back
+      Observable.create(new Observable.OnSubscribe<Object>() {
+        @Override public void call(Subscriber<? super Object> subscriber) {
+          try {
+            Thread.sleep(3000);
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+          subscriber.onNext(null);
+          subscriber.onCompleted();
+        }
+      })
+          .subscribeOn(Schedulers.newThread())
+          .observeOn(AndroidSchedulers.mainThread())
+          .subscribe(new Action1<Object>() {
+            @Override public void call(Object o) {
+              if (highString.equals("")) Log.e("Wear", "Connect with phone!");
+            }
+          });
     }
 
     public Bitmap getResizedBitmap(Bitmap bm, int newHeight, int newWidth) {
@@ -271,55 +432,31 @@ public class MyWatchFace extends CanvasWatchFaceService {
       updateTimer();
     }
 
-    /**
-     * Captures tap event (and tap type) and toggles the background color if the user finishes
-     * a tap.
-     */
-    @Override public void onTapCommand(int tapType, int x, int y, long eventTime) {
-      Resources resources = MyWatchFace.this.getResources();
-      switch (tapType) {
-        case TAP_TYPE_TOUCH:
-          // The user has started touching the screen.
-          break;
-        case TAP_TYPE_TOUCH_CANCEL:
-          // The user has started a different gesture or otherwise cancelled the tap.
-          break;
-        case TAP_TYPE_TAP:
-          // The user has completed the tap gesture.
-          mTapCount++;
-          mBackgroundPaint.setColor(
-              resources.getColor(mTapCount % 2 == 0 ? R.color.background : R.color.background2));
-          break;
-      }
-      invalidate();
-    }
-
-
     @Override public void onDraw(Canvas canvas, Rect bounds) {
       // Draw the background.
-      if (isInAmbientMode()) {
-        canvas.drawColor(Color.BLACK);
-      } else {
-        canvas.drawRect(0, 0, bounds.width(), bounds.height(), mBackgroundPaint);
-      }
-
       mTime.setToNow();
 
       String text = String.format("%02d:%02d", mTime.hour, mTime.minute);
 
-      int middle = canvas.getWidth() / 2;
-      int xPos = (int) (middle - (mTimePaint.measureText(text) / 2));
-      int xDate = (int) (middle - mDatePaint.measureText(dateString) / 2);
-      float timeHeight = mTimePaint.getTextSize();
-      canvas.drawText(dateString, xDate, mYOffset - timeHeight, mDatePaint);
+      final int middle = canvas.getWidth() / 2;
+      final int xPos = (int) (middle - (mTimePaint.measureText(text) / 2));
+      final int xDate = (int) (middle - mDatePaint.measureText(dateString) / 2);
+      final float timeHeight = mTimePaint.getTextSize();
+
+      if (isInAmbientMode()) {
+        canvas.drawColor(Color.BLACK);
+      } else {
+        canvas.drawRect(0, 0, bounds.width(), bounds.height(), mBackgroundPaint);
+        canvas.drawText(dateString, xDate, mYOffset - timeHeight, mDatePaint);
+        final float yHigh = mYOffset + timeHeight;
+
+        canvas.drawText(highString, middle - mHighPaint.measureText(highString), yHigh, mHighPaint);
+        canvas.drawText(lowString, middle - mLowPaint.measureText(lowString),
+            yHigh + mLowPaint.getTextSize(), mLowPaint);
+
+        canvas.drawBitmap(mBitmapWeather, middle, mYOffset, mBackgroundPaint);
+      }
       canvas.drawText(text, xPos, mYOffset, mTimePaint);
-      final float yHigh = mYOffset + timeHeight;
-
-      canvas.drawText(highString, middle - mHighPaint.measureText(highString), yHigh, mHighPaint);
-      canvas.drawText(lowString, middle - mLowPaint.measureText(lowString),
-          yHigh + mLowPaint.getTextSize(), mLowPaint);
-
-      canvas.drawBitmap(bitmap, middle, mYOffset, mBackgroundPaint);
     }
 
     /**
